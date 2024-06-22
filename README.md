@@ -24,46 +24,115 @@
 
 各コンポーネントは抵抗（R）とコンプライアンス（C）の組み合わせでモデル化されています。
 
-## 主要な数式
 
-時変エラスタンス関数:
-\[
-e(t) = \begin{cases} 
-\frac{1}{2}\left(\sin\left(\frac{\pi t}{T_{max}} - \frac{\pi}{2}\right) + 1\right)(1-b) + b & \text{if } 0 \leq t < T_{max} \\
-e^{-(t-T_{max})/\tau}(1-b) + b & \text{if } T_{max} \leq t < \frac{3T_{max}}{2} \\
-b & \text{if } \frac{3T_{max}}{2} \leq t < \frac{60000}{HR}
-\end{cases}
-\]
-
-心腔内圧力:
-\[
-P(V,t) = P_{ed}(V) + e(t-AV_{delay})(P_{es}(V) - P_{ed}(V))
-\]
 
 ## API使用方法
 
-このモデルはRESTful APIを通じて利用可能です。以下は基本的な使用例です：
-
-```bash
-curl -X POST https://api-endpoint/optimize \
--H "Content-Type: application/json" \
--d '{
-    "target_metrics": [
-        [52.5, "stroke_volume", 1.0],
-        [10.3, "central_venous_pressure", 20.0],
-        [20.7, "pulmonary_capillary_wedge_pressure", 4.0],
-        [126.1, "systolic_arterial_pressure", 0.8],
-        [69.5, "diastolic_arterial_pressure", 1.0],
-        [46.6, "systolic_pulmonary_arterial_pressure", 2.0],
-        [21.1, "diastolic_pulmonary_arterial_pressure", 2.0],
-        [55.0, "left_ventricular_ejection_fraction", 1.0]
-    ],
-    "param_updates": {
-        "HR": [80.0, null, false]
-    },
-    "num_repeats": 1
-}'
+## APIの入力について
+APIは以下の形式のJSONデータを受け付けます：
+```json
+{
+  "target_metrics": [
+    [52.5, "stroke_volume", 1.0],
+    [10.3, "central_venous_pressure", 20.0],
+    [20.7, "pulmonary_capillary_wedge_pressure", 4.0],
+    [126.1, "systolic_arterial_pressure", 0.8],
+    [69.5, "diastolic_arterial_pressure", 1.0],
+    [46.6, "systolic_pulmonary_arterial_pressure", 2.0],
+    [21.1, "diastolic_pulmonary_arterial_pressure", 2.0],
+    [55.0, "left_ventricular_ejection_fraction", 1.0]
+  ],
+  "param_updates": {
+    "HR": [80.0, null, false],
+    "LV_V0": [10.0, [5.0, 15.0], true]
+  },
+  "num_repeats": 1
+}
 ```
+### 入力パラメータの説明
+
+1. target_metrics: 目標とする循環動態の指標（必須）
+
+* 形式: [目標値, 指標名, 重み]
+* 全8項目（上記例参照）を必ず含める必要があります
+* 重みは最適化過程でその指標の重要度を決定します
+
+2. param_updates: 更新または固定したいパラメータ（オプション）
+
+* 形式: "パラメータ名": [値, 範囲, フィッティングフラグ]
+* 値: 新しい値（nullの場合、現在の値を保持）
+* 範囲: 新しい範囲 [最小値, 最大値]（nullの場合、デフォルト範囲を使用）
+* フィッティングフラグ: true（最適化対象）またはfalse（固定値）
+
+
+3. num_repeats: 最適化プロセスの繰り返し回数（オプション、デフォルト: 1）
+
+### 注意事項
+
+* target_metricsの8項目は全て指定する必要があります。
+* param_updatesを指定しない場合、デフォルトのパラメータ設定が使用されます。
+* パラメータを固定したい場合（例：HR）、フィッティングフラグをfalseに設定します。
+* 最適化の精度を上げるにはnum_repeatsを増やしますが、計算時間も増加します。
+
+### 主要なパラメータ
+
+* HR: 心拍数
+* Rcs, Rcp, Ras, Rvs, etc.: 各部位の血管抵抗
+* Cas, Cvs, Cap, Cvp: 各部位の血管コンプライアンス
+* LV_Ees, RV_Ees, LA_Ees, RA_Ees: 各心腔の収縮末期エラスタンス
+* LV_alpha, LV_beta, etc.: 心室の拡張性パラメータ
+
+詳細なパラメータリストとその意味については、パラメータ詳細ドキュメントを参照してください。
+
+## API出力例
+
+最適化プロセス完了後、APIは以下のような JSON レスポンスを返します：
+
+```json
+{
+  "best_parameters": {
+    "parameters": {
+      "Rcs": {
+        "value": 842.5,
+        "default": 830.0,
+        "range": [400.0, 1000.0],
+        "fitting": true
+      },
+      "Cas": {
+        "value": 1.95,
+        "default": 1.83,
+        "range": [0.5, 4.0],
+        "fitting": true
+      },
+      "LV_Ees": {
+        "value": 2.18,
+        "default": 2.21,
+        "range": [1.0, 3.0],
+        "fitting": true
+      },
+      // ... 他のパラメータ ...
+      "HR": {
+        "value": 80.0,
+        "default": 90.0,
+        "range": [90.0, 90.0],
+        "fitting": false
+      }
+    }
+  },
+  "best_fitness": 0.0023
+}
+
+## APIの出力について
+
+* best_parameters: 最適化された各パラメータの情報を含みます。
+
+** value: 最適化後の値
+** default: デフォルト値
+** range: 許容範囲
+**fitting: 最適化の対象だったかどうか（true/false）
+
+
+* best_fitness: 最適化アルゴリズムが達成した最良の適合度（誤差）。値が小さいほど、目標の指標に近いことを意味します。
 
 ## 応用例
 
