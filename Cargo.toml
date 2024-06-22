@@ -1,15 +1,21 @@
 [package]
-name = "cardiovascular_model"
+name = "cardiovascular_model_fitting"
 version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-actix-web = "4.0"
-serde = { version = "1.0", features = ["derive"] }
-serde_json = "1.0"
+axum = "0.7.5"
+serde = { version = "1.0.160", features = ["derive"] }
+serde_json = "1.0.96"
+tokio = { version = "1.28.0", features = ["full"] }
 rand = "0.8"
 rayon = "1.5"
 fxhash = "0.2"
 num_cpus = "1.13"
-fxhash = "0.2.1"
-pcg_rand = "0.13.0"
+pcg_rand = "0.13"
+tower = "0.4"
+tower-http = { version = "0.5", features = ["trace"] }
+
+[[bin]]
+name = "cardiovascular_model_fitting"
+path = "src/main.rs"

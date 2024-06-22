@@ -1,7 +1,12 @@
-use actix_web::{web, HttpResponse, Responder};
-use serde::{Deserialize, Serialize};
 use crate::model::simulation;
 use crate::model::parameters::HemodynamicParams;
+
+use axum::{
+    extract::Json,
+    response::IntoResponse,
+};
+use serde::{Deserialize, Serialize};
+
 use fxhash::FxHashMap;
 
 #[derive(Deserialize)]
@@ -17,12 +22,12 @@ pub struct OptimizationResult {
     pub best_fitness: f64,
 }
 
-async fn optimize(params: web::Json<OptimizationParams>) -> impl Responder {
+pub async fn optimize(Json(params): Json<OptimizationParams>) -> impl IntoResponse {
     let OptimizationParams {
         target_metrics,
         param_updates,
         num_repeats,
-    } = params.into_inner();
+    } = params;
 
     let (best_params, best_fitness) = simulation::run_optimization(
         &target_metrics,
@@ -30,15 +35,8 @@ async fn optimize(params: web::Json<OptimizationParams>) -> impl Responder {
         num_repeats,
     );
 
-    HttpResponse::Ok().json(OptimizationResult {
+    Json(OptimizationResult {
         best_parameters: best_params,
         best_fitness,
     })
-}
-
-pub fn config(cfg: &mut web::ServiceConfig) {
-    cfg.service(
-        web::resource("/optimize")
-            .route(web::post().to(optimize))
-    );
 }

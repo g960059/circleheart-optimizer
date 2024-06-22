@@ -1,10 +1,13 @@
 use crate::model::parameters::HemodynamicParams;
 use rayon::prelude::*;
-use rand::prelude::*;
 use std::f64::consts::PI;
+use std::env;
 use num_cpus;
 use rayon::ThreadPoolBuilder;
 use fxhash::FxHashMap;
+use pcg_rand::Pcg32;
+use rand::SeedableRng;
+use rand::Rng;
 
 #[inline]
 fn e(t: f64, Tmax: f64, tau: f64, HR: f64) -> f64 {
@@ -91,9 +94,10 @@ fn pv_func(t: f64, state: &[f64; 11], params: &HemodynamicParams) -> [f64; 11] {
     flows
 }
 
+#[derive(Debug)]
 pub struct SimulationResult {
-    pub t: Vec<f64>,
-    pub y: Vec<Vec<f64>>,
+    t: [f64; 5001],
+    y: [[f64; 11]; 5001],
 }
 
 pub fn runge_kutta_4<F>(
@@ -371,7 +375,7 @@ pub fn run_optimization(
   param_updates: Option<FxHashMap<String, (Option<f64>, Option<(f64, f64)>, Option<bool>)>>,
   num_repeats: usize
 ) -> (HemodynamicParams, f64) {
-  let cpus = num_cpus::get();
+  let cpus = num_cpus::get().max(8);
   let threads_per_start = cpus / num_repeats;
 
   let results: Vec<(HemodynamicParams, f64)> = (0..num_repeats)

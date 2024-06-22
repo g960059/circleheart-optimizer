@@ -1,19 +1,22 @@
-mod model;
 mod api;
+mod model;
 
-use actix_web::{App, HttpServer};
+use axum::{
+    routing::post,
+    Router,
+};
+use std::net::SocketAddr;
+use tokio::net::TcpListener;
 
-#[actix_web::main]
-async fn main() -> std::io::Result<()> {
+#[tokio::main]
+async fn main() {
+    let app = Router::new().route("/optimize", post(api::routes::optimize));
+
     let port = std::env::var("PORT").unwrap_or_else(|_| "8080".to_string());
-    
-    println!("Starting server on port {}", port);
+    let addr = SocketAddr::from(([0, 0, 0, 0], port.parse().unwrap()));
 
-    HttpServer::new(|| {
-        App::new()
-            .configure(api::routes::config)
-    })
-    .bind(format!("0.0.0.0:{}", port))?
-    .run()
-    .await
+    println!("Listening on {}", addr);
+
+    let listener = TcpListener::bind(addr).await.unwrap();
+    axum::serve(listener, app).await.unwrap();
 }
